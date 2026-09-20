@@ -72,7 +72,7 @@ Règles importantes :
     return Response.json({
       analysis: response.output_text,
     });
-  } } catch (error) {
+  } catch (error) {
   console.error("Erreur analyse graphique :", error);
 
   return Response.json(
