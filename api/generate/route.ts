@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+ import OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -72,14 +72,19 @@ Règles importantes :
     return Response.json({
       analysis: response.output_text,
     });
-  } catch (error) {
-    console.error("Erreur analyse graphique :", error);
+  } } catch (error) {
+  console.error("Erreur analyse graphique :", error);
 
-    return Response.json(
-      {
-        error: "Erreur lors de la communication avec l'IA.",
-      },
-      { status: 500 }
+  return Response.json(
+    {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Erreur inconnue lors de la communication avec l'IA.",
+    },
+    { status: 500 }
+  );
+}
     );
   }
 }
