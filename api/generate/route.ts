@@ -1,13 +1,10 @@
 import OpenAI from "openai";
-
-export async function POST(req: Request) {
-  try {
-    if (!process.env.OPENAI_API_KEY) {
-      return Response.json(
-        { error: "OPENAI_API_KEY est absente des variables d'environnement." },
-        { status: 500 }
-      );
-    }
+export async function POST() {
+  return Response.json({
+    ok: true,
+    message: "La route /api/generate fonctionne !",
+  });
+}
 
     const { image } = await req.json();
 
