@@ -111,45 +111,65 @@ export default function Home() {
   // ANALYSER LE GRAPHIQUE
   // =========================
 
-  async function analyzeChart() {
-    if (!image) {
-      alert("Sélectionne d'abord un graphique.");
-      return;
-    }
+ async function analyzeChart() {
+  if (!image) {
+    alert("Sélectionne d'abord un graphique.");
+    return;
+  }
 
-    setLoadingAnalysis(true);
-    setAnalysis("");
+  setLoadingAnalysis(true);
+  setAnalysis("");
+
+  try {
+    const response = await fetch("/api/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        image,
+      }),
+    });
+
+    const text = await response.text();
+
+    let data;
 
     try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          image,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Erreur pendant l'analyse."
-        );
-      }
-
-      setAnalysis(data.analysis);
-    } catch (error) {
-      console.error(error);
-
-      setAnalysis(
-        "❌ Impossible d'analyser le graphique. Vérifie que la clé OpenAI est bien configurée."
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(
+        `Réponse serveur invalide (${response.status}) : ${text}`
       );
-    } finally {
-      setLoadingAnalysis(false);
     }
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        `Erreur serveur HTTP ${response.status}`
+      );
+    }
+
+    if (!data.analysis) {
+      throw new Error(
+        "Le serveur n'a renvoyé aucune analyse."
+      );
+    }
+
+    setAnalysis(data.analysis);
+
+  } catch (error) {
+    console.error("Erreur scanner :", error);
+
+    setAnalysis(
+      `❌ ${error instanceof Error
+        ? error.message
+        : "Erreur inconnue"}`
+    );
+  } finally {
+    setLoadingAnalysis(false);
   }
+}
 
   // =========================
   // COACH IA
