@@ -1,19 +1,15 @@
 import OpenAI from "openai";
 
-const apiKey = process.env.OPENAI_API_KEY;
-
-if (!apiKey) {
-  console.error("OPENAI_API_KEY est absente");
-}
-
-const openai = new OpenAI({
-  apiKey,
-});
-
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const image = body?.image;
+    if (!process.env.OPENAI_API_KEY) {
+      return Response.json(
+        { error: "OPENAI_API_KEY est absente des variables d'environnement." },
+        { status: 500 }
+      );
+    }
+
+    const { image } = await req.json();
 
     if (!image) {
       return Response.json(
@@ -22,27 +18,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!apiKey) {
-      return Response.json(
-        { error: "OPENAI_API_KEY n'est pas configurée sur le serveur." },
-        { status: 500 }
-      );
-    }
-
-    if (
-      typeof image !== "string" ||
-      (!image.startsWith("data:image/") &&
-        !image.startsWith("https://") &&
-        !image.startsWith("http://"))
-    ) {
-      return Response.json(
-        {
-          error:
-            "Format d'image invalide. L'image doit être une URL ou une image base64 data:image/...",
-        },
-        { status: 400 }
-      );
-    }
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
     const response = await openai.responses.create({
       model: "gpt-5.6-luna",
@@ -101,7 +79,7 @@ Règles :
       analysis: response.output_text,
     });
   } catch (error) {
-    console.error("ERREUR OPENAI:", error);
+    console.error("Erreur analyse graphique :", error);
 
     return Response.json(
       {
