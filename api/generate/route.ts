@@ -1,16 +1,45 @@
 import OpenAI from "openai";
 
+const apiKey = process.env.OPENAI_API_KEY;
+
+if (!apiKey) {
+  console.error("OPENAI_API_KEY est absente");
+}
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey,
 });
 
 export async function POST(req: Request) {
   try {
-    const { image } = await req.json();
+    const body = await req.json();
+    const image = body?.image;
 
     if (!image) {
       return Response.json(
         { error: "Aucune image reçue." },
+        { status: 400 }
+      );
+    }
+
+    if (!apiKey) {
+      return Response.json(
+        { error: "OPENAI_API_KEY n'est pas configurée sur le serveur." },
+        { status: 500 }
+      );
+    }
+
+    if (
+      typeof image !== "string" ||
+      (!image.startsWith("data:image/") &&
+        !image.startsWith("https://") &&
+        !image.startsWith("http://"))
+    ) {
+      return Response.json(
+        {
+          error:
+            "Format d'image invalide. L'image doit être une URL ou une image base64 data:image/...",
+        },
         { status: 400 }
       );
     }
@@ -40,7 +69,7 @@ Recherche notamment :
 - Scénario baissier
 - Risques
 
-Règles importantes :
+Règles :
 - Ne jamais inventer un prix.
 - Ne jamais inventer un timeframe.
 - Ne jamais inventer un indicateur.
@@ -72,14 +101,14 @@ Règles importantes :
       analysis: response.output_text,
     });
   } catch (error) {
-    console.error("Erreur analyse graphique :", error);
+    console.error("ERREUR OPENAI:", error);
 
     return Response.json(
       {
         error:
           error instanceof Error
             ? error.message
-            : "Erreur inconnue lors de la communication avec l'IA.",
+            : "Erreur inconnue.",
       },
       { status: 500 }
     );
