@@ -108,8 +108,11 @@ pas un conseil financier personnalisé.
             },
 
             {
-              type: "input_image",
-              image_url: image,
+              {
+  type: "input_image",
+  image_url: image,
+  detail: "high"
+}
             },
           ],
         },
