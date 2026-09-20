@@ -1,4 +1,4 @@
- import OpenAI from "openai";
+import OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -17,7 +17,6 @@ export async function POST(req: Request) {
 
     const response = await openai.responses.create({
       model: "gpt-5.6-luna",
-
       input: [
         {
           role: "developer",
@@ -73,18 +72,16 @@ Règles importantes :
       analysis: response.output_text,
     });
   } catch (error) {
-  console.error("Erreur analyse graphique :", error);
+    console.error("Erreur analyse graphique :", error);
 
-  return Response.json(
-    {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Erreur inconnue lors de la communication avec l'IA.",
-    },
-    { status: 500 }
-  );
-}
+    return Response.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Erreur inconnue lors de la communication avec l'IA.",
+      },
+      { status: 500 }
     );
   }
 }
