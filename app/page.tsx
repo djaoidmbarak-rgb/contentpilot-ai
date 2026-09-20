@@ -10,15 +10,35 @@ type Trade = {
 
 export default function Home() {
   const [page, setPage] = useState("home");
-  const [trades, setTrades] = useState<Trade[]>([]);
 
+  // =========================
+  // JOURNAL DE TRADING
+  // =========================
+
+  const [trades, setTrades] = useState<Trade[]>([]);
   const [symbol, setSymbol] = useState("");
   const [pnl, setPnl] = useState("");
   const [side, setSide] = useState("Long");
 
+  // =========================
+  // SCANNER IA
+  // =========================
+
   const [image, setImage] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState("");
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+
+  // =========================
+  // COACH IA
+  // =========================
+
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
+  const [loadingCoach, setLoadingCoach] = useState(false);
+
+  // =========================
+  // STATISTIQUES
+  // =========================
 
   const totalPnl = trades.reduce(
     (total, trade) => total + trade.pnl,
@@ -34,23 +54,31 @@ export default function Home() {
       ? Math.round((winningTrades / trades.length) * 100)
       : 0;
 
+  // =========================
+  // AJOUTER UN TRADE
+  // =========================
+
   function addTrade() {
-    if (!symbol || pnl === "") {
+    if (!symbol.trim() || pnl === "") {
       alert("Remplis le symbole et le P&L.");
       return;
     }
 
     const newTrade: Trade = {
-      symbol,
+      symbol: symbol.toUpperCase(),
       pnl: Number(pnl),
       side,
     };
 
-    setTrades([...trades, newTrade]);
+    setTrades((previous) => [...previous, newTrade]);
 
     setSymbol("");
     setPnl("");
   }
+
+  // =========================
+  // UPLOAD GRAPHIQUE
+  // =========================
 
   function handleImage(
     event: React.ChangeEvent<HTMLInputElement>
@@ -59,32 +87,125 @@ export default function Home() {
 
     if (!file) return;
 
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Image trop lourde. Maximum 10 MB.");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      alert("Sélectionne une image.");
+      return;
+    }
+
     const reader = new FileReader();
 
     reader.onload = () => {
       setImage(reader.result as string);
+      setAnalysis("");
     };
 
     reader.readAsDataURL(file);
   }
 
-  function analyzeChart() {
-    alert(
-      "Analyse du graphique lancée. La vraie IA sera connectée ensuite."
-    );
+  // =========================
+  // ANALYSER LE GRAPHIQUE
+  // =========================
+
+  async function analyzeChart() {
+    if (!image) {
+      alert("Sélectionne d'abord un graphique.");
+      return;
+    }
+
+    setLoadingAnalysis(true);
+    setAnalysis("");
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          image,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Erreur pendant l'analyse."
+        );
+      }
+
+      setAnalysis(data.analysis);
+    } catch (error) {
+      console.error(error);
+
+      setAnalysis(
+        "❌ Impossible d'analyser le graphique. Vérifie que la clé OpenAI est bien configurée."
+      );
+    } finally {
+      setLoadingAnalysis(false);
+    }
   }
 
-  function askCoach() {
-    if (!question.trim()) return;
+  // =========================
+  // COACH IA
+  // =========================
 
-    setMessages([
-      ...messages,
-      "👤 " + question,
-      "🤖 Analyse simulée : vérifie ton contexte, ton risque et tes règles avant de prendre une position.",
+  async function askCoach() {
+    if (!question.trim() || loadingCoach) return;
+
+    const userQuestion = question.trim();
+
+    setMessages((previous) => [
+      ...previous,
+      "👤 " + userQuestion,
     ]);
 
     setQuestion("");
+    setLoadingCoach(true);
+
+    try {
+      const response = await fetch("/api/coach", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question: userQuestion,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Erreur du coach IA."
+        );
+      }
+
+      setMessages((previous) => [
+        ...previous,
+        "🤖 " + data.answer,
+      ]);
+    } catch (error) {
+      console.error(error);
+
+      setMessages((previous) => [
+        ...previous,
+        "🤖 ❌ Une erreur est survenue avec le coach IA.",
+      ]);
+    } finally {
+      setLoadingCoach(false);
+    }
   }
+
+  // =========================
+  // INTERFACE
+  // =========================
 
   return (
     <main className="app">
@@ -92,390 +213,460 @@ export default function Home() {
       {/* HEADER */}
 
       <header className="header">
+        <div>
+          <div className="logo">
+            TradePilot <span>AI</span>
+          </div>
 
-        <div className="logo">
-          Trade<span>Pilot</span> AI
+          <div className="subtitle">
+            Ton copilote de trading
+          </div>
         </div>
 
-        <div className="avatar">
-          TP
+        <div className="status">
+          <span></span>
+          IA ACTIVE
         </div>
-
       </header>
 
+      {/* =========================
+          ACCUEIL
+      ========================= */}
 
-      {/* CONTENU */}
+      {page === "home" && (
+        <section className="content">
 
-      <div className="content">
+          <div className="hero">
+            <div className="heroIcon">🤖</div>
 
-        {/* ACCUEIL */}
+            <h1>
+              Bienvenue sur
+              <br />
+              <span>TradePilot AI</span>
+            </h1>
 
-        {page === "home" && (
-          <>
-            <h1>Salut 👋</h1>
-
-            <p className="muted">
-              Ton assistant de trading IA
+            <p>
+              Analyse tes graphiques, comprends ton
+              marché et améliore ta discipline de trading.
             </p>
+          </div>
 
-            <div className="dashboard-card">
-
-              <h2>📊 Tes performances</h2>
-
-              <div className="stats">
-
-                <div>
-                  <small>P&L</small>
-                  <strong
-                    className={
-                      totalPnl >= 0
-                        ? "green"
-                        : "red"
-                    }
-                  >
-                    €{totalPnl.toFixed(2)}
-                  </strong>
-                </div>
-
-                <div>
-                  <small>Trades</small>
-                  <strong>
-                    {trades.length}
-                  </strong>
-                </div>
-
-                <div>
-                  <small>Win Rate</small>
-                  <strong>
-                    {winRate}%
-                  </strong>
-                </div>
-
-              </div>
-
-            </div>
-
-
-            <h2>Que veux-tu faire ?</h2>
-
+          <div className="cards">
 
             <ActionCard
-              icon="📷"
-              title="Analyser un graphique"
-              description="Ajoute une capture et analyse ton graphique."
+              icon="📸"
+              title="Scanner IA"
+              text="Envoie ton graphique et laisse l'IA l'analyser."
               onClick={() => setPage("scanner")}
             />
 
-
             <ActionCard
-              icon="➕"
-              title="Logger un trade"
-              description="Enregistre ton opération dans ton journal."
-              onClick={() => setPage("trade")}
-            />
-
-
-            <ActionCard
-              icon="🤖"
-              title="Demander au coach"
-              description="Discute avec ton coach de trading."
+              icon="🧠"
+              title="Coach IA"
+              text="Pose tes questions et apprends à mieux trader."
               onClick={() => setPage("coach")}
             />
 
-
             <ActionCard
-              icon="📈"
-              title="Dashboard"
-              description="Consulte tes statistiques."
-              onClick={() => setPage("dashboard")}
+              icon="📊"
+              title="Journal"
+              text="Enregistre tes trades et suis tes performances."
+              onClick={() => setPage("trade")}
             />
 
-          </>
-        )}
+          </div>
 
+          <div className="statsGrid">
 
-        {/* SCANNER */}
+            <Stat
+              label="Trades"
+              value={trades.length.toString()}
+            />
 
-        {page === "scanner" && (
-          <>
-            <button
-              className="back"
-              onClick={() => setPage("home")}
-            >
-              ← Retour
-            </button>
+            <Stat
+              label="Win Rate"
+              value={`${winRate}%`}
+            />
 
-            <h1>📷 Analyse graphique</h1>
+            <Stat
+              label="P&L"
+              value={`${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)} €`}
+            />
 
-            <p className="muted">
-              Sélectionne une capture depuis ton téléphone.
-            </p>
+          </div>
 
-            <div className="card">
+        </section>
+      )}
 
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImage}
-              />
+      {/* =========================
+          SCANNER
+      ========================= */}
 
-              {image && (
-                <img
-                  src={image}
-                  alt="Graphique"
-                  className="chart-image"
-                />
-              )}
+      {page === "scanner" && (
+        <section className="content">
 
-              <button
-                className="primary"
-                onClick={analyzeChart}
-              >
-                🔍 Analyser le graphique
-              </button>
+          <SectionTitle
+            icon="📸"
+            title="Analyse graphique"
+            subtitle="Laisse l'IA étudier ton graphique."
+          />
 
-            </div>
+          <div className="uploadBox">
 
-          </>
-        )}
-
-
-        {/* TRADE */}
-
-        {page === "trade" && (
-          <>
-            <button
-              className="back"
-              onClick={() => setPage("home")}
-            >
-              ← Retour
-            </button>
-
-            <h1>➕ Nouveau trade</h1>
-
-            <div className="card">
-
-              <label>Symbole</label>
-
-              <input
-                value={symbol}
-                onChange={(e) =>
-                  setSymbol(e.target.value)
-                }
-                placeholder="BTCUSDT"
-              />
-
-
-              <label>Direction</label>
-
-              <select
-                value={side}
-                onChange={(e) =>
-                  setSide(e.target.value)
-                }
-              >
-                <option>Long</option>
-                <option>Short</option>
-              </select>
-
-
-              <label>P&L</label>
-
-              <input
-                type="number"
-                value={pnl}
-                onChange={(e) =>
-                  setPnl(e.target.value)
-                }
-                placeholder="Ex : 120"
-              />
-
-
-              <button
-                className="primary"
-                onClick={addTrade}
-              >
-                💾 Enregistrer le trade
-              </button>
-
-            </div>
-
-          </>
-        )}
-
-
-        {/* DASHBOARD */}
-
-        {page === "dashboard" && (
-          <>
-            <button
-              className="back"
-              onClick={() => setPage("home")}
-            >
-              ← Retour
-            </button>
-
-            <h1>📊 Dashboard</h1>
-
-            <div className="stats-grid">
-
-              <Stat
-                title="P&L total"
-                value={`€${totalPnl.toFixed(2)}`}
-              />
-
-              <Stat
-                title="Trades"
-                value={String(trades.length)}
-              />
-
-              <Stat
-                title="Win Rate"
-                value={`${winRate}%`}
-              />
-
-              <Stat
-                title="Gagnants"
-                value={String(winningTrades)}
-              />
-
-            </div>
-
-
-            <h2>Derniers trades</h2>
-
-            {trades.length === 0 && (
-              <div className="card muted">
-                Aucun trade enregistré.
-              </div>
-            )}
-
-            {trades.map((trade, index) => (
-
-              <div
-                className="trade"
-                key={index}
-              >
-
-                <div>
-                  <strong>
-                    {trade.symbol}
-                  </strong>
-
-                  <small>
-                    {trade.side}
-                  </small>
+            {!image ? (
+              <>
+                <div className="uploadIcon">
+                  📊
                 </div>
 
-                <strong
-                  className={
-                    trade.pnl >= 0
-                      ? "green"
-                      : "red"
-                  }
-                >
-                  {trade.pnl >= 0 ? "+" : ""}
-                  €{trade.pnl.toFixed(2)}
-                </strong>
+                <h2>
+                  Ajoute ton graphique
+                </h2>
 
+                <p>
+                  PNG, JPG ou WEBP — maximum 10 MB
+                </p>
+
+                <label className="uploadButton">
+                  Choisir une image
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImage}
+                  />
+                </label>
+              </>
+            ) : (
+              <>
+                <img
+                  src={image}
+                  alt="Graphique sélectionné"
+                  className="chartImage"
+                />
+
+                <div className="buttonRow">
+
+                  <label className="secondaryButton">
+                    Changer l'image
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImage}
+                    />
+                  </label>
+
+                  <button
+                    className="primaryButton"
+                    onClick={analyzeChart}
+                    disabled={loadingAnalysis}
+                  >
+                    {loadingAnalysis
+                      ? "⏳ Analyse en cours..."
+                      : "🤖 Analyser avec l'IA"}
+                  </button>
+
+                </div>
+              </>
+            )}
+
+          </div>
+
+          {analysis && (
+            <div className="analysisBox">
+
+              <div className="analysisTitle">
+                🤖 Analyse TradePilot AI
               </div>
 
-            ))}
+              <div className="analysisText">
+                {analysis}
+              </div>
 
-          </>
-        )}
+            </div>
+          )}
 
+          <div className="warning">
+            ⚠️ L'analyse IA est informative et ne
+            constitue pas un conseil financier personnalisé.
+          </div>
 
-        {/* COACH */}
+        </section>
+      )}
 
-        {page === "coach" && (
-          <>
-            <button
-              className="back"
-              onClick={() => setPage("home")}
+      {/* =========================
+          AJOUTER TRADE
+      ========================= */}
+
+      {page === "trade" && (
+        <section className="content">
+
+          <SectionTitle
+            icon="📈"
+            title="Journal de trading"
+            subtitle="Enregistre tes opérations."
+          />
+
+          <div className="formCard">
+
+            <label>
+              Symbole
+            </label>
+
+            <input
+              value={symbol}
+              onChange={(e) =>
+                setSymbol(e.target.value)
+              }
+              placeholder="Ex : BTCUSD"
+            />
+
+            <label>
+              P&L (€)
+            </label>
+
+            <input
+              type="number"
+              value={pnl}
+              onChange={(e) =>
+                setPnl(e.target.value)
+              }
+              placeholder="Ex : 125"
+            />
+
+            <label>
+              Direction
+            </label>
+
+            <select
+              value={side}
+              onChange={(e) =>
+                setSide(e.target.value)
+              }
             >
-              ← Retour
+              <option>Long</option>
+              <option>Short</option>
+            </select>
+
+            <button
+              className="primaryButton full"
+              onClick={addTrade}
+            >
+              + Ajouter le trade
             </button>
 
-            <h1>🤖 Coach IA</h1>
+          </div>
 
-            <div className="chat">
+          <div className="tradeList">
 
-              <div className="message ai">
-                👋 Salut ! Je suis ton coach.
-                Pose-moi une question.
+            {trades.length === 0 ? (
+              <div className="empty">
+                Aucun trade enregistré.
               </div>
+            ) : (
+              trades.map((trade, index) => (
+                <div
+                  className="tradeItem"
+                  key={index}
+                >
+                  <div>
+                    <strong>
+                      {trade.symbol}
+                    </strong>
 
-              {messages.map(
-                (message, index) => (
-                  <div
-                    key={index}
-                    className="message"
-                  >
-                    {message}
+                    <small>
+                      {trade.side}
+                    </small>
                   </div>
-                )
+
+                  <strong
+                    className={
+                      trade.pnl >= 0
+                        ? "profit"
+                        : "loss"
+                    }
+                  >
+                    {trade.pnl >= 0 ? "+" : ""}
+                    {trade.pnl.toFixed(2)} €
+                  </strong>
+                </div>
+              ))
+            )}
+
+          </div>
+
+        </section>
+      )}
+
+      {/* =========================
+          DASHBOARD
+      ========================= */}
+
+      {page === "dashboard" && (
+        <section className="content">
+
+          <SectionTitle
+            icon="📊"
+            title="Dashboard"
+            subtitle="Tes statistiques de trading."
+          />
+
+          <div className="statsLarge">
+
+            <Stat
+              label="P&L total"
+              value={`${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)} €`}
+            />
+
+            <Stat
+              label="Trades"
+              value={trades.length.toString()}
+            />
+
+            <Stat
+              label="Trades gagnants"
+              value={winningTrades.toString()}
+            />
+
+            <Stat
+              label="Win Rate"
+              value={`${winRate}%`}
+            />
+
+          </div>
+
+        </section>
+      )}
+
+      {/* =========================
+          COACH IA
+      ========================= */}
+
+      {page === "coach" && (
+        <section className="content">
+
+          <SectionTitle
+            icon="🧠"
+            title="Coach IA"
+            subtitle="Pose ta question à TradePilot."
+          />
+
+          <div className="coachBox">
+
+            <div className="messages">
+
+              {messages.length === 0 && (
+                <div className="coachWelcome">
+                  <div className="bigEmoji">
+                    🤖
+                  </div>
+
+                  <h2>
+                    Bonjour 👋
+                  </h2>
+
+                  <p>
+                    Je suis ton coach IA.
+                    Pose-moi une question sur le
+                    trading, la structure du marché,
+                    le risque ou ta psychologie.
+                  </p>
+                </div>
+              )}
+
+              {messages.map((message, index) => (
+                <div
+                  className="message"
+                  key={index}
+                >
+                  {message}
+                </div>
+              ))}
+
+              {loadingCoach && (
+                <div className="message">
+                  🤖 ⏳ Je réfléchis...
+                </div>
               )}
 
             </div>
 
-            <input
-              value={question}
-              onChange={(e) =>
-                setQuestion(e.target.value)
-              }
-              placeholder="Ex : pourquoi ce trade était mauvais ?"
-            />
+            <div className="coachInput">
 
-            <button
-              className="primary"
-              onClick={askCoach}
-            >
-              Envoyer
-            </button>
+              <input
+                value={question}
+                onChange={(e) =>
+                  setQuestion(e.target.value)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    askCoach();
+                  }
+                }}
+                placeholder="Pose ta question..."
+              />
 
-          </>
-        )}
+              <button
+                onClick={askCoach}
+                disabled={loadingCoach}
+              >
+                ➤
+              </button>
 
-      </div>
+            </div>
 
+          </div>
 
-      {/* NAVIGATION */}
+        </section>
+      )}
 
-      <nav className="navigation">
+      {/* =========================
+          NAVIGATION
+      ========================= */}
+
+      <nav className="bottomNav">
 
         <NavButton
-          icon="🏠"
-          text="Accueil"
+          icon="⌂"
+          label="Accueil"
+          active={page === "home"}
           onClick={() => setPage("home")}
         />
 
         <NavButton
-          icon="📷"
-          text="Scanner"
+          icon="📸"
+          label="Scanner"
+          active={page === "scanner"}
           onClick={() => setPage("scanner")}
         />
 
         <NavButton
           icon="➕"
-          text="Trade"
+          label="Trade"
+          active={page === "trade"}
           onClick={() => setPage("trade")}
         />
 
         <NavButton
           icon="📊"
-          text="Stats"
+          label="Stats"
+          active={page === "dashboard"}
           onClick={() => setPage("dashboard")}
         />
 
         <NavButton
-          icon="🤖"
-          text="Coach"
+          icon="🧠"
+          label="Coach"
+          active={page === "coach"}
           onClick={() => setPage("coach")}
         />
 
       </nav>
 
+      {/* =========================
+          STYLE
+      ========================= */}
 
       <style jsx>{`
 
@@ -485,18 +676,27 @@ export default function Home() {
 
         .app {
           min-height: 100vh;
-          background: #08070f;
+          background:
+            radial-gradient(
+              circle at top,
+              #18233b 0%,
+              #080c14 45%,
+              #05070b 100%
+            );
           color: white;
-          font-family: Arial, sans-serif;
-          padding-bottom: 90px;
+          font-family:
+            Inter,
+            Arial,
+            sans-serif;
+          padding-bottom: 100px;
         }
 
         .header {
-          height: 70px;
-          padding: 15px 20px;
           display: flex;
           justify-content: space-between;
           align-items: center;
+          padding: 24px;
+          border-bottom: 1px solid rgba(255,255,255,.08);
         }
 
         .logo {
@@ -505,219 +705,433 @@ export default function Home() {
         }
 
         .logo span {
-          color: #9b5cff;
+          color: #5ee7a5;
         }
 
-        .avatar {
-          background: #292638;
-          padding: 12px;
+        .subtitle {
+          color: #7e8ba3;
+          font-size: 12px;
+          margin-top: 3px;
+        }
+
+        .status {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          color: #5ee7a5;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .status span {
+          width: 7px;
+          height: 7px;
           border-radius: 50%;
+          background: #5ee7a5;
+          box-shadow: 0 0 12px #5ee7a5;
         }
 
         .content {
-          max-width: 600px;
+          max-width: 900px;
           margin: auto;
-          padding: 20px;
+          padding: 30px 20px;
         }
 
-        h1 {
-          font-size: 32px;
-          margin-bottom: 8px;
+        .hero {
+          text-align: center;
+          padding: 30px 0;
         }
 
-        h2 {
-          margin-top: 25px;
+        .heroIcon {
+          font-size: 60px;
+          margin-bottom: 15px;
         }
 
-        .muted {
-          color: #9995a8;
+        .hero h1 {
+          font-size: 36px;
+          line-height: 1.15;
+          margin: 0;
         }
 
-        .dashboard-card,
-        .card,
-        .action {
-          background: #15131f;
-          border: 1px solid #29263a;
+        .hero h1 span {
+          color: #5ee7a5;
+        }
+
+        .hero p {
+          color: #8995aa;
+          max-width: 550px;
+          margin: 18px auto;
+          line-height: 1.6;
+        }
+
+        .cards {
+          display: grid;
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(220px, 1fr)
+            );
+          gap: 15px;
+        }
+
+        .actionCard {
+          background: rgba(255,255,255,.045);
+          border: 1px solid rgba(255,255,255,.08);
           border-radius: 20px;
-          padding: 20px;
-          margin-top: 14px;
-        }
-
-        .action {
+          padding: 22px;
           cursor: pointer;
-          transition: 0.2s;
+          transition: .2s;
         }
 
-        .action:hover {
-          border-color: #9b5cff;
-          transform: translateY(-2px);
+        .actionCard:hover {
+          transform: translateY(-3px);
+          border-color: #5ee7a5;
         }
 
-        .action-icon {
-          font-size: 25px;
-          margin-bottom: 12px;
+        .actionIcon {
+          font-size: 30px;
+          margin-bottom: 15px;
         }
 
-        .action p {
-          color: #9995a8;
+        .actionCard h3 {
+          margin: 0 0 8px;
         }
 
-        .stats {
+        .actionCard p {
+          color: #8995aa;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+
+        .statsGrid,
+        .statsLarge {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 10px;
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(150px, 1fr)
+            );
+          gap: 12px;
           margin-top: 20px;
         }
 
-        .stats small,
-        .stats strong {
-          display: block;
-        }
-
-        .stats small {
-          color: #9995a8;
-        }
-
-        .stats strong {
-          font-size: 21px;
-          margin-top: 5px;
-        }
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-top: 20px;
-        }
-
-        .stat-box {
-          background: #15131f;
-          border: 1px solid #29263a;
+        .stat {
+          background: rgba(255,255,255,.04);
+          border: 1px solid rgba(255,255,255,.07);
           border-radius: 16px;
           padding: 18px;
         }
 
-        .stat-box small {
-          color: #9995a8;
+        .statLabel {
+          color: #7f8aa0;
+          font-size: 12px;
         }
 
-        .stat-box strong {
-          display: block;
-          font-size: 23px;
+        .statValue {
+          font-size: 25px;
+          font-weight: 800;
           margin-top: 8px;
+        }
+
+        .sectionTitle {
+          margin-bottom: 25px;
+        }
+
+        .sectionTitle h1 {
+          margin: 0;
+          font-size: 30px;
+        }
+
+        .sectionTitle p {
+          color: #8490a5;
+          margin-top: 8px;
+        }
+
+        .uploadBox,
+        .formCard,
+        .coachBox,
+        .analysisBox {
+          background: rgba(255,255,255,.04);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 20px;
+          padding: 25px;
+        }
+
+        .uploadBox {
+          text-align: center;
+        }
+
+        .uploadIcon {
+          font-size: 55px;
+        }
+
+        .uploadBox h2 {
+          margin-bottom: 8px;
+        }
+
+        .uploadBox p {
+          color: #7f8aa0;
         }
 
         input,
         select {
           width: 100%;
-          padding: 14px;
-          margin: 8px 0 15px;
-          background: #0e0d15;
+          padding: 14px 15px;
+          background: #0c111c;
           color: white;
-          border: 1px solid #29263a;
+          border: 1px solid #263044;
           border-radius: 12px;
+          outline: none;
+          margin-top: 7px;
+          margin-bottom: 17px;
         }
 
-        .primary {
-          width: 100%;
-          padding: 15px;
-          border: none;
-          border-radius: 13px;
-          background: linear-gradient(
-            135deg,
-            #9b5cff,
-            #6330c9
-          );
-          color: white;
-          font-weight: bold;
-          cursor: pointer;
+        input:focus,
+        select:focus {
+          border-color: #5ee7a5;
         }
 
-        .back {
-          background: none;
-          border: none;
-          color: #aaa;
-          font-size: 15px;
-          margin-bottom: 15px;
-        }
-
-        .chart-image {
-          width: 100%;
-          max-height: 350px;
-          object-fit: contain;
-          border-radius: 15px;
-          margin: 15px 0;
-        }
-
-        .trade {
-          display: flex;
-          justify-content: space-between;
+        .uploadButton,
+        .secondaryButton,
+        .primaryButton {
+          display: inline-flex;
           align-items: center;
-          background: #15131f;
-          border: 1px solid #29263a;
-          border-radius: 15px;
-          padding: 15px;
-          margin-top: 10px;
+          justify-content: center;
+          gap: 8px;
+          border-radius: 12px;
+          padding: 13px 18px;
+          cursor: pointer;
+          border: none;
+          font-weight: 700;
         }
 
-        .trade small {
+        .uploadButton,
+        .primaryButton {
+          background: #5ee7a5;
+          color: #06100b;
+        }
+
+        .secondaryButton {
+          background: #151c2a;
+          color: white;
+        }
+
+        .primaryButton:disabled {
+          opacity: .5;
+          cursor: not-allowed;
+        }
+
+        .uploadButton input,
+        .secondaryButton input {
+          display: none;
+        }
+
+        .chartImage {
+          width: 100%;
+          max-height: 600px;
+          object-fit: contain;
+          border-radius: 14px;
+          margin-bottom: 20px;
+          background: black;
+        }
+
+        .buttonRow {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+
+        .analysisBox {
+          margin-top: 20px;
+          text-align: left;
+        }
+
+        .analysisTitle {
+          font-size: 18px;
+          font-weight: 800;
+          color: #5ee7a5;
+          margin-bottom: 18px;
+        }
+
+        .analysisText {
+          white-space: pre-wrap;
+          color: #dce3ef;
+          line-height: 1.7;
+        }
+
+        .warning {
+          margin-top: 15px;
+          color: #a8b2c4;
+          font-size: 12px;
+          text-align: center;
+          line-height: 1.5;
+        }
+
+        .formCard label {
           display: block;
-          color: #9995a8;
-          margin-top: 5px;
+          font-size: 13px;
+          color: #9ba6b9;
         }
 
-        .green {
-          color: #4ee19a;
+        .full {
+          width: 100%;
         }
 
-        .red {
-          color: #ff647e;
-        }
-
-        .chat {
-          background: #111019;
-          border: 1px solid #29263a;
-          border-radius: 15px;
-          padding: 15px;
-          min-height: 250px;
+        .tradeList {
           margin-top: 20px;
         }
 
+        .tradeItem {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: rgba(255,255,255,.04);
+          border: 1px solid rgba(255,255,255,.07);
+          border-radius: 14px;
+          padding: 17px;
+          margin-bottom: 10px;
+        }
+
+        .tradeItem small {
+          display: block;
+          color: #7f8aa0;
+          margin-top: 4px;
+        }
+
+        .profit {
+          color: #5ee7a5;
+        }
+
+        .loss {
+          color: #ff7373;
+        }
+
+        .empty {
+          text-align: center;
+          color: #7f8aa0;
+          padding: 30px;
+        }
+
+        .coachBox {
+          display: flex;
+          flex-direction: column;
+          min-height: 550px;
+        }
+
+        .messages {
+          flex: 1;
+          overflow-y: auto;
+        }
+
+        .coachWelcome {
+          text-align: center;
+          max-width: 500px;
+          margin: 60px auto;
+        }
+
+        .bigEmoji {
+          font-size: 55px;
+        }
+
+        .coachWelcome p {
+          color: #8995aa;
+          line-height: 1.6;
+        }
+
         .message {
-          background: #252131;
-          padding: 10px;
+          background: #101725;
+          border: 1px solid #202a3c;
+          border-radius: 14px;
+          padding: 14px;
+          margin-bottom: 10px;
+          white-space: pre-wrap;
+          line-height: 1.6;
+        }
+
+        .coachInput {
+          display: flex;
+          gap: 10px;
+          margin-top: 20px;
+        }
+
+        .coachInput input {
+          margin: 0;
+        }
+
+        .coachInput button {
+          width: 50px;
+          border: none;
           border-radius: 12px;
-          margin: 8px 0;
+          background: #5ee7a5;
+          cursor: pointer;
+          font-size: 20px;
         }
 
-        .message.ai {
-          background: #1d1830;
+        .coachInput button:disabled {
+          opacity: .5;
         }
 
-        .navigation {
+        .bottomNav {
           position: fixed;
           bottom: 0;
           left: 0;
           right: 0;
           height: 75px;
-          background: #111019;
-          border-top: 1px solid #29263a;
+          background: rgba(7,10,16,.94);
+          backdrop-filter: blur(15px);
+          border-top: 1px solid rgba(255,255,255,.08);
           display: flex;
-          justify-content: space-around;
-          align-items: center;
+          justify-content: center;
+          gap: 5px;
+          z-index: 50;
         }
 
-        .nav-button {
-          background: none;
+        .navButton {
+          flex: 1;
+          max-width: 130px;
           border: none;
-          color: #9995a8;
+          background: transparent;
+          color: #69758b;
           cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
           font-size: 11px;
         }
 
-        .nav-button div {
+        .navButton.active {
+          color: #5ee7a5;
+        }
+
+        .navIcon {
           font-size: 20px;
-          margin-bottom: 3px;
+        }
+
+        @media (max-width: 600px) {
+
+          .hero h1 {
+            font-size: 29px;
+          }
+
+          .content {
+            padding: 25px 15px;
+          }
+
+          .header {
+            padding: 18px 15px;
+          }
+
+          .buttonRow {
+            flex-direction: column;
+          }
+
+          .buttonRow > * {
+            width: 100%;
+          }
+
         }
 
       `}</style>
@@ -726,73 +1140,102 @@ export default function Home() {
   );
 }
 
-
-/* CARTE */
+// =========================
+// COMPOSANTS
+// =========================
 
 function ActionCard({
   icon,
   title,
-  description,
+  text,
   onClick,
 }: {
   icon: string;
   title: string;
-  description: string;
+  text: string;
   onClick: () => void;
 }) {
   return (
     <div
-      className="action"
+      className="actionCard"
       onClick={onClick}
     >
-      <div className="action-icon">
+      <div className="actionIcon">
         {icon}
       </div>
 
       <h3>{title}</h3>
 
-      <p>{description}</p>
+      <p>{text}</p>
     </div>
   );
 }
 
-
-/* STATISTIQUE */
-
 function Stat({
-  title,
+  label,
   value,
 }: {
-  title: string;
+  label: string;
   value: string;
 }) {
   return (
-    <div className="stat-box">
-      <small>{title}</small>
-      <strong>{value}</strong>
+    <div className="stat">
+      <div className="statLabel">
+        {label}
+      </div>
+
+      <div className="statValue">
+        {value}
+      </div>
     </div>
   );
 }
 
+function SectionTitle({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="sectionTitle">
+      <h1>
+        {icon} {title}
+      </h1>
 
-/* NAVIGATION */
+      <p>{subtitle}</p>
+    </div>
+  );
+}
 
 function NavButton({
   icon,
-  text,
+  label,
+  active,
   onClick,
 }: {
   icon: string;
-  text: string;
+  label: string;
+  active: boolean;
   onClick: () => void;
 }) {
   return (
     <button
-      className="nav-button"
+      className={
+        active
+          ? "navButton active"
+          : "navButton"
+      }
       onClick={onClick}
     >
-      <div>{icon}</div>
-      {text}
+      <span className="navIcon">
+        {icon}
+      </span>
+
+      <span>{label}</span>
     </button>
   );
 }
